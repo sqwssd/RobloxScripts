@@ -4,6 +4,9 @@ local CoreGui = game:GetService("CoreGui")
 local TweenService = game:GetService("TweenService")
 local RunService = game:GetService("RunService")
 local localPlayer = Players.LocalPlayer
+local mapMarkers = {}
+local minX, maxX = -264, 876
+local minZ, maxZ = -593, 298
 local function cleanupAll()
     local names = {"SqwssColorOrDie", "SqwssHub", "ObbyHub", "MinimalistHub"}
     for _, name in ipairs(names) do
@@ -38,6 +41,11 @@ local function cleanupAll()
             if beam then beam:Destroy() end
         end
     end
+    for _, marker in pairs(mapMarkers) do
+        if marker then marker:Destroy() end
+    end
+    table.clear(mapMarkers)
+    if workspace:FindFirstChild("SqwssTutorialHighlight") then workspace.SqwssTutorialHighlight:Destroy() end
 end
 cleanupAll()
 local ScreenGui = Instance.new("ScreenGui")
@@ -78,6 +86,42 @@ local MainStroke = Instance.new("UIStroke")
 MainStroke.Color = Color3.fromRGB(40, 42, 52)
 MainStroke.Thickness = 1.2
 MainStroke.Parent = MainFrame
+local CloseBtn = Instance.new("TextButton")
+CloseBtn.Size = UDim2.new(0, 20, 0, 20)
+CloseBtn.Position = UDim2.new(1, -30, 0, 10)
+CloseBtn.BackgroundColor3 = Color3.fromRGB(244, 67, 54)
+CloseBtn.Text = "×"
+CloseBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+CloseBtn.Font = Enum.Font.GothamBold
+CloseBtn.TextSize = 14
+CloseBtn.Parent = MainFrame
+local CBCorner = Instance.new("UICorner")
+CBCorner.CornerRadius = UDim.new(0.5, 0)
+CBCorner.Parent = CloseBtn
+CloseBtn.MouseButton1Click:Connect(function()
+    cleanupAll()
+end)
+local MinBtn = Instance.new("TextButton")
+MinBtn.Size = UDim2.new(0, 20, 0, 20)
+MinBtn.Position = UDim2.new(1, -55, 0, 10)
+MinBtn.BackgroundColor3 = Color3.fromRGB(48, 50, 60)
+MinBtn.Text = "-"
+MinBtn.TextColor3 = Color3.fromRGB(240, 240, 245)
+MinBtn.Font = Enum.Font.GothamBold
+MinBtn.TextSize = 14
+MinBtn.Parent = MainFrame
+local MBCorner = Instance.new("UICorner")
+MBCorner.CornerRadius = UDim.new(0.5, 0)
+MBCorner.Parent = MinBtn
+local guiVisible = true
+local function toggleGui()
+    guiVisible = not guiVisible
+    MainFrame.Visible = guiVisible
+    ToggleButton.Text = guiVisible and "★" or "☰"
+end
+MinBtn.MouseButton1Click:Connect(function()
+    toggleGui()
+end)
 local Sidebar = Instance.new("Frame")
 Sidebar.Size = UDim2.new(0, 130, 1, 0)
 Sidebar.BackgroundColor3 = Color3.fromRGB(15, 16, 20)
@@ -225,6 +269,7 @@ local showBrushes = false
 local showTools = false
 local showMonster = false
 local tutorialEnabled = false
+local mapEnabled = false
 local espFolder = Instance.new("Folder")
 espFolder.Name = "SqwssESP"
 espFolder.Parent = parent
@@ -294,6 +339,7 @@ local function makeToggle(parentPage, text, default, callback)
         TweenService:Create(ToggleBtn, TweenInfo.new(0.15), {BackgroundColor3 = targetColor}):Play()
         callback(state)
     end)
+    return ToggleBtn, Ball
 end
 local function makeSlider(parentPage, text, min, max, default, callback)
     local Frame = Instance.new("Frame")
@@ -664,6 +710,246 @@ TutorialLabel.TextColor3 = Color3.fromRGB(240, 240, 245)
 TutorialLabel.Font = Enum.Font.GothamBold
 TutorialLabel.TextSize = 11
 TutorialLabel.Parent = TutorialGui
+local MinimapFrame = Instance.new("Frame")
+MinimapFrame.Name = "SqwssMinimap"
+MinimapFrame.Size = UDim2.new(0, 300, 0, 240)
+MinimapFrame.Position = UDim2.new(1, -320, 0.5, -120)
+MinimapFrame.BackgroundColor3 = Color3.fromRGB(24, 25, 32)
+MinimapFrame.BorderSizePixel = 0
+MinimapFrame.Active = true
+MinimapFrame.Visible = false
+MinimapFrame.Parent = ScreenGui
+local MMCorner = Instance.new("UICorner")
+MMCorner.CornerRadius = UDim.new(0, 10)
+MMCorner.Parent = MinimapFrame
+local MMStroke = Instance.new("UIStroke")
+MMStroke.Color = Color3.fromRGB(66, 133, 244)
+MMStroke.Thickness = 1.2
+MMStroke.Parent = MinimapFrame
+local MMHeader = Instance.new("Frame")
+MMHeader.Size = UDim2.new(1, 0, 0, 30)
+MMHeader.BackgroundTransparency = 1
+MMHeader.Parent = MinimapFrame
+local MMTitle = Instance.new("TextLabel")
+MMTitle.Size = UDim2.new(0.6, 0, 1, 0)
+MMTitle.Position = UDim2.new(0, 12, 0, 0)
+MMTitle.BackgroundTransparency = 1
+MMTitle.Text = "MAZE MAP"
+MMTitle.TextColor3 = Color3.fromRGB(255, 255, 255)
+MMTitle.Font = Enum.Font.GothamBold
+MMTitle.TextSize = 11
+MMTitle.TextXAlignment = Enum.TextXAlignment.Left
+MMTitle.Parent = MMHeader
+local MMClose = Instance.new("TextButton")
+MMClose.Size = UDim2.new(0, 16, 0, 16)
+MMClose.Position = UDim2.new(1, -26, 0.5, -8)
+MMClose.BackgroundColor3 = Color3.fromRGB(244, 67, 54)
+MMClose.Text = "×"
+MMClose.TextColor3 = Color3.fromRGB(255, 255, 255)
+MMClose.Font = Enum.Font.GothamBold
+MMClose.TextSize = 11
+MMClose.Parent = MMHeader
+local MMCCorner = Instance.new("UICorner")
+MMCCorner.CornerRadius = UDim.new(0.5, 0)
+MMCCorner.Parent = MMClose
+local mapCanvas = Instance.new("Frame")
+mapCanvas.Size = UDim2.new(0, 280, 0, 200)
+mapCanvas.Position = UDim2.new(0.5, -140, 1, -205)
+mapCanvas.BackgroundTransparency = 1
+mapCanvas.Parent = MinimapFrame
+local mapViewport = Instance.new("Frame")
+mapViewport.Size = UDim2.new(0, 280, 0, 200)
+mapViewport.Position = UDim2.new(0.5, -140, 1, -205)
+mapViewport.BackgroundColor3 = Color3.fromRGB(15, 16, 20)
+mapViewport.BorderSizePixel = 0
+mapViewport.ClipsDescendants = true
+mapViewport.Parent = MinimapFrame
+mapCanvas.Parent = mapViewport
+local MCCorner = Instance.new("UICorner")
+MCCorner.CornerRadius = UDim.new(0, 6)
+MCCorner.Parent = mapViewport
+local zoomScale = 1.0
+local panOffset = Vector2.new(0, 0)
+local panning = false
+local panStart = nil
+local panOffsetStart = nil
+local activeTouches = {}
+local lastPinchDist = nil
+local function updateMapLayout()
+    mapCanvas.Size = UDim2.new(0, 280 * zoomScale, 0, 200 * zoomScale)
+    mapCanvas.Position = UDim2.new(0.5, panOffset.X - (280 * zoomScale)/2, 0.5, panOffset.Y - (200 * zoomScale)/2)
+end
+mapViewport.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        if input.UserInputType == Enum.UserInputType.Touch then
+            activeTouches[input.UserInputIndex] = input.Position
+        end
+        local touchCount = 0
+        for _ in pairs(activeTouches) do touchCount = touchCount + 1 end
+        if touchCount < 2 then
+            panning = true
+            panStart = input.Position
+            panOffsetStart = panOffset
+        else
+            panning = false
+        end
+    end
+end)
+UserInputService.InputChanged:Connect(function(input)
+    if not mapEnabled or not guiVisible then return end
+    if input.UserInputType == Enum.UserInputType.Touch then
+        if activeTouches[input.UserInputIndex] then
+            activeTouches[input.UserInputIndex] = input.Position
+        end
+    end
+    local touchCount = 0
+    local touches = {}
+    for index, pos in pairs(activeTouches) do
+        touchCount = touchCount + 1
+        table.insert(touches, pos)
+    end
+    if touchCount == 2 then
+        panning = false
+        local dist = (touches[1] - touches[2]).Magnitude
+        if lastPinchDist then
+            local delta = (dist - lastPinchDist) * 0.015
+            zoomScale = math.clamp(zoomScale + delta, 1.0, 8.0)
+            updateMapLayout()
+        end
+        lastPinchDist = dist
+    elseif panning and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+        lastPinchDist = nil
+        local delta = input.Position - panStart
+        panOffset = panOffsetStart + Vector2.new(delta.X, delta.Y)
+        local maxPanX = (280 * zoomScale - 280) / 2 + 100
+        local maxPanY = (200 * zoomScale - 200) / 2 + 100
+        panOffset = Vector2.new(
+            math.clamp(panOffset.X, -maxPanX, maxPanX),
+            math.clamp(panOffset.Y, -maxPanY, maxPanY)
+        )
+        updateMapLayout()
+    end
+end)
+UserInputService.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        if input.UserInputType == Enum.UserInputType.Touch then
+            activeTouches[input.UserInputIndex] = nil
+        end
+        local touchCount = 0
+        for _ in pairs(activeTouches) do touchCount = touchCount + 1 end
+        if touchCount < 2 then
+            lastPinchDist = nil
+        end
+        if touchCount == 0 then
+            panning = false
+        end
+    end
+end)
+mapViewport.InputChanged:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseWheel then
+        zoomScale = math.clamp(zoomScale + input.Position.Z * 0.15, 1.0, 8.0)
+        local maxPanX = (280 * zoomScale - 280) / 2 + 100
+        local maxPanY = (200 * zoomScale - 200) / 2 + 100
+        panOffset = Vector2.new(
+            math.clamp(panOffset.X, -maxPanX, maxPanX),
+            math.clamp(panOffset.Y, -maxPanY, maxPanY)
+        )
+        updateMapLayout()
+    end
+end)
+local mmDragToggle = nil
+local mmDragStart = nil
+local mmStartPos = nil
+MMHeader.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        mmDragToggle = true
+        mmDragStart = input.Position
+        mmStartPos = MinimapFrame.Position
+        
+        input.Changed:Connect(function()
+            if input.UserInputState == Enum.UserInputState.End then
+                mmDragToggle = false
+            end
+        end)
+    end
+end)
+UserInputService.InputChanged:Connect(function(input)
+    if mmDragToggle and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+        local delta = input.Position - mmDragStart
+        local position = UDim2.new(mmStartPos.X.Scale, mmStartPos.X.Offset + delta.X, mmStartPos.Y.Scale, mmStartPos.Y.Offset + delta.Y)
+        TweenService:Create(MinimapFrame, TweenInfo.new(0.08, Enum.EasingStyle.Quad), {Position = position}):Play()
+    end
+end)
+local function getPartXZBounds(part)
+    local cf = part.CFrame
+    local size = part.Size
+    local xVectors = {
+        cf:VectorToWorldSpace(Vector3.new(size.X/2, 0, 0)),
+        cf:VectorToWorldSpace(Vector3.new(-size.X/2, 0, 0)),
+        cf:VectorToWorldSpace(Vector3.new(0, 0, size.Z/2)),
+        cf:VectorToWorldSpace(Vector3.new(0, 0, -size.Z/2))
+    }
+    local minX2, maxX2 = 999999, -999999
+    local minZ2, maxZ2 = 999999, -999999
+    for _, v in ipairs(xVectors) do
+        local worldPos = cf.Position + v
+        if worldPos.X < minX2 then minX2 = worldPos.X end
+        if worldPos.X > maxX2 then maxX2 = worldPos.X end
+        if worldPos.Z < minZ2 then minZ2 = worldPos.Z end
+        if worldPos.Z > maxZ2 then maxZ2 = worldPos.Z end
+    end
+    return maxX2 - minX2, maxZ2 - minZ2
+end
+local function drawStaticWalls()
+    local maze = workspace:FindFirstChild("Environment")
+    maze = maze and maze:FindFirstChild("Maze")
+    if not maze then return end
+    
+    local folders = {
+        maze:FindFirstChild("BlackOutlines"),
+        maze:FindFirstChild("Contour"),
+        maze:FindFirstChild("BlackRoom"),
+        maze:FindFirstChild("SecretPassage"),
+        maze:FindFirstChild("ScrewDriverCorridor")
+    }
+    
+    for _, folder in ipairs(folders) do
+        if folder then
+            for _, part in ipairs(folder:GetDescendants()) do
+                if part:IsA("BasePart") and part.Transparency < 1 then
+                    local w, h = getPartXZBounds(part)
+                    local wPct = w / (maxX - minX)
+                    local hPct = h / (maxZ - minZ)
+                    local xPct = (part.Position.X - minX) / (maxX - minX)
+                    local zPct = (part.Position.Z - minZ) / (maxZ - minZ)
+                    
+                    local wall = Instance.new("Frame")
+                    wall.Size = UDim2.new(wPct, 0, hPct, 0)
+                    wall.Position = UDim2.new(xPct - wPct/2, 0, zPct - hPct/2, 0)
+                    wall.BackgroundColor3 = Color3.fromRGB(45, 47, 58)
+                    wall.BorderSizePixel = 0
+                    wall.ZIndex = 1
+                    wall.Parent = mapCanvas
+                end
+            end
+        end
+    end
+end
+drawStaticWalls()
+local mapToggleBtn, mapToggleBall
+mapToggleBtn, mapToggleBall = makeToggle(tabs["Guide"].Page, "Show Maze Minimap", false, function(v)
+    mapEnabled = v
+    MinimapFrame.Visible = v
+end)
+MMClose.MouseButton1Click:Connect(function()
+    mapEnabled = false
+    MinimapFrame.Visible = false
+    panning = false
+    table.clear(activeTouches)
+    lastPinchDist = nil
+    TweenService:Create(mapToggleBall, TweenInfo.new(0.15), {Position = UDim2.new(0, 3, 0.5, -8)}):Play()
+    TweenService:Create(mapToggleBtn, TweenInfo.new(0.15), {BackgroundColor3 = Color3.fromRGB(48, 50, 60)}):Play()
+end)
 makeToggle(tabs["Guide"].Page, "Step-by-Step Tutorial Guide", false, function(v)
     tutorialEnabled = v
 end)
@@ -676,6 +962,48 @@ makeButton(tabs["Guide"].Page, "Teleport to Current Objective", function()
         end
     end
 end)
+local function updateMapMarker(key, text, pos, color, isMonster, isPlayer)
+    local marker = mapMarkers[key]
+    if not marker or not marker.Parent then
+        marker = Instance.new("Frame")
+        marker.Size = isPlayer and UDim2.new(0, 8, 0, 8) or (isMonster and UDim2.new(0, 8, 0, 8) or UDim2.new(0, 6, 0, 6))
+        marker.BackgroundColor3 = color
+        marker.BorderSizePixel = 0
+        marker.ZIndex = isPlayer and 5 or (isMonster and 4 or 2)
+        marker.Parent = mapCanvas
+        
+        local mc = Instance.new("UICorner")
+        mc.CornerRadius = UDim.new(0.5, 0)
+        mc.Parent = marker
+        
+        if not isPlayer and not isMonster then
+            local stroke = Instance.new("UIStroke")
+            stroke.Color = Color3.fromRGB(0, 0, 0)
+            stroke.Thickness = 0.5
+            stroke.Parent = marker
+        end
+        if isMonster or isPlayer or (not isPlayer and text ~= "") then
+            local lbl = Instance.new("TextLabel")
+            lbl.Size = UDim2.new(0, 60, 0, 12)
+            lbl.Position = UDim2.new(0.5, -30, 0, -14)
+            lbl.BackgroundTransparency = 1
+            lbl.TextColor3 = color
+            lbl.Text = text
+            lbl.Font = Enum.Font.GothamBold
+            lbl.TextSize = 7
+            lbl.TextStrokeTransparency = 0.2
+            lbl.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
+            lbl.Parent = marker
+        end
+        
+        mapMarkers[key] = marker
+    end
+    
+    local xPct = (pos.X - minX) / (maxX - minX)
+    local zPct = (pos.Z - minZ) / (maxZ - minZ)
+    marker.Position = UDim2.new(xPct, -marker.Size.X.Offset/2, zPct, -marker.Size.Y.Offset/2)
+    marker.Visible = true
+end
 makeButton(tabs["Teleport"].Page, "Teleport to Spawn / Safe Zone", function()
     tpToCFrame(getLobbySpawn())
 end)
@@ -766,7 +1094,7 @@ local AboutText = Instance.new("TextLabel")
 AboutText.Size = UDim2.new(1, 0, 1, -40)
 AboutText.Position = UDim2.new(0, 0, 0, 35)
 AboutText.BackgroundTransparency = 1
-AboutText.Text = "Developer / Creator:\nsqwss\n\nFeatures:\n- Item ESP (Paint, Brushes, Tools)\n- Monster Highlight / Chams\n- Speed & Jump adjustments\n- Fly, Noclip & Infinite Jump\n- Item Teleports\n- Step-by-step Game Guide & Beam Tracer\n\nEnjoy the game!"
+AboutText.Text = "Developer / Creator:\nsqwss\n\nFeatures:\n- Item ESP (Paint, Brushes, Tools)\n- Monster Highlight / Chams\n- Speed & Jump adjustments\n- Fly, Noclip & Infinite Jump\n- Item Teleports\n- Step-by-step Game Guide & Beam Tracer\n- 2D Maze Minimap Window\n\nEnjoy the game!"
 AboutText.TextColor3 = Color3.fromRGB(180, 182, 190)
 AboutText.Font = Enum.Font.GothamMedium
 AboutText.TextSize = 13
@@ -953,6 +1281,79 @@ RunService.RenderStepped:Connect(function()
         updateTutorialBeam(nil)
     end
 end)
+RunService.RenderStepped:Connect(function()
+    local char = localPlayer.Character
+    local hrp = char and char:FindFirstChild("HumanoidRootPart")
+    
+    local showMap = mapEnabled and guiVisible
+    if not showMap then
+        for _, marker in pairs(mapMarkers) do
+            marker.Visible = false
+        end
+        return
+    end
+    
+    local activeKeys = {}
+    
+    if hrp then
+        updateMapMarker("Player", "YOU", hrp.Position, Color3.fromRGB(50, 255, 50), false, true)
+        activeKeys["Player"] = true
+    end
+    
+    local monsters = workspace:FindFirstChild("GameplayAssets")
+    monsters = monsters and monsters:FindFirstChild("Monsters")
+    if monsters then
+        for _, model in ipairs(monsters:GetChildren()) do
+            if model:IsA("Model") then
+                local primary = model.PrimaryPart or model:FindFirstChildWhichIsA("BasePart")
+                if primary then
+                    local key = "Monster_" .. model.Name
+                    updateMapMarker(key, "💀", primary.Position, Color3.fromRGB(255, 50, 50), true, false)
+                    activeKeys[key] = true
+                end
+            end
+        end
+    end
+    
+    local doors = workspace:FindFirstChild("GameplayParts")
+    doors = doors and doors:FindFirstChild("Doors")
+    if doors then
+        local catNames = {"Normal", "Secret", "Completion"}
+        for _, catName in ipairs(catNames) do
+            local cat = doors:FindFirstChild(catName)
+            if cat then
+                for _, sub in ipairs(cat:GetChildren()) do
+                    if sub:IsA("Folder") then
+                        for _, door in ipairs(sub:GetChildren()) do
+                            if door:IsA("Model") then
+                                local core = door:FindFirstChild("Core") or door:FindFirstChildWhichIsA("BasePart")
+                                if core and core.CanCollide then
+                                    local key = "Door_" .. door:GetFullName()
+                                    local color = colorMap[door.Name] or Color3.fromRGB(200, 200, 200)
+                                    updateMapMarker(key, door.Name, core.Position, color, false, false)
+                                    activeKeys[key] = true
+                                end
+                            end
+                        end
+                    elseif sub:IsA("Model") then
+                        local core = sub:FindFirstChild("Core") or sub:FindFirstChildWhichIsA("BasePart")
+                        if core and core.CanCollide then
+                            local key = "Door_" .. sub:GetFullName()
+                            updateMapMarker(key, sub.Name, core.Position, Color3.fromRGB(255, 255, 255), false, false)
+                            activeKeys[key] = true
+                        end
+                    end
+                end
+            end
+        end
+    end
+    
+    for key, marker in pairs(mapMarkers) do
+        if not activeKeys[key] then
+            marker.Visible = false
+        end
+    end
+end)
 UserInputService.JumpRequest:Connect(function()
     if infJumpEnabled and localPlayer.Character then
         local hum = localPlayer.Character:FindFirstChildOfClass("Humanoid")
@@ -975,12 +1376,6 @@ RunService.RenderStepped:Connect(function()
         end
     end
 end)
-local guiVisible = true
-local function toggleGui()
-    guiVisible = not guiVisible
-    MainFrame.Visible = guiVisible
-    ToggleButton.Text = guiVisible and "★" or "☰"
-end
 ToggleButton.MouseButton1Click:Connect(toggleGui)
 UserInputService.InputBegan:Connect(function(input, processed)
     if not processed then
