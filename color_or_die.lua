@@ -25,6 +25,19 @@ local function cleanupAll()
             if h then h:Destroy() end
         end
     end
+    if workspace:FindFirstChild("SqwssTutorialHighlight") then 
+        workspace.SqwssTutorialHighlight:Destroy() 
+    end
+    local char = localPlayer.Character
+    if char then
+        local hrp = char:FindFirstChild("HumanoidRootPart")
+        if hrp then
+            local att = hrp:FindFirstChild("SqwssTutorialAtt")
+            if att then att:Destroy() end
+            local beam = hrp:FindFirstChild("SqwssTutorialBeam")
+            if beam then beam:Destroy() end
+        end
+    end
 end
 cleanupAll()
 local ScreenGui = Instance.new("ScreenGui")
@@ -113,7 +126,7 @@ local startPos = nil
 local function updateInput(input)
     local delta = input.Position - dragStart
     local position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
-    TweenService:Create(MainFrame, TweenInfo.new(0.08, Enum.EasingStyle.OutQuad), {Position = position}):Play()
+    TweenService:Create(MainFrame, TweenInfo.new(0.08, Enum.EasingStyle.Quad), {Position = position}):Play()
 end
 MainFrame.InputBegan:Connect(function(input)
     if (input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch) and not UserInputService:GetFocusedTextBox() then
@@ -191,6 +204,7 @@ local function createTab(tabName, displayName)
 end
 createTab("Main", "Hacks")
 createTab("ESP", "ESP Controls")
+createTab("Guide", "Guide")
 createTab("Teleport", "Teleports")
 createTab("About", "Info")
 tabs["Main"].Page.Visible = true
@@ -210,6 +224,7 @@ local showPaint = false
 local showBrushes = false
 local showTools = false
 local showMonster = false
+local tutorialEnabled = false
 local espFolder = Instance.new("Folder")
 espFolder.Name = "SqwssESP"
 espFolder.Parent = parent
@@ -475,6 +490,15 @@ makeToggle(tabs["ESP"].Page, "Show Paint Buckets ESP", false, function(v) showPa
 makeToggle(tabs["ESP"].Page, "Show Brushes ESP", false, function(v) showBrushes = v end)
 makeToggle(tabs["ESP"].Page, "Show Tools ESP", false, function(v) showTools = v end)
 makeToggle(tabs["ESP"].Page, "Show Monster Highlight & ESP", false, function(v) showMonster = v end)
+local function isModelVisible(model)
+    if not model or not model.Parent then return false end
+    for _, part in ipairs(model:GetDescendants()) do
+        if part:IsA("BasePart") and part.Transparency < 1 then
+            return true
+        end
+    end
+    return false
+end
 local function getLobbySpawn()
     for _, v in ipairs(workspace:GetDescendants()) do
         if v:IsA("SpawnLocation") and v.Enabled then
@@ -488,14 +512,126 @@ local function getLobbySpawn()
     end
     return CFrame.new(0, 5, 0)
 end
-local function isModelVisible(model)
-    if not model or not model.Parent then return false end
-    for _, part in ipairs(model:GetDescendants()) do
-        if part:IsA("BasePart") and part.Transparency < 1 then
-            return true
+local function getNextTutorialStep()
+    local paints = {"Red", "Orange", "Yellow", "Green", "Teal", "Blue", "Purple", "Pink", "White"}
+    for _, color in ipairs(paints) do
+        local bucket = workspace.GameplayAssets.Items.Normal.PaintBucket:FindFirstChild(color)
+        if bucket and isModelVisible(bucket) then
+            return {
+                Text = "Collect " .. color:upper() .. " Paint Bucket 🎨",
+                Target = bucket
+            }
+        end
+        local door = workspace.GameplayParts.Doors.Normal.Paintable:FindFirstChild(color)
+        local core = door and door:FindFirstChild("Core")
+        if core and core.CanCollide then
+            return {
+                Text = "Unlock " .. color:upper() .. " Door 🚪",
+                Target = core
+            }
         end
     end
-    return false
+    local tools = {"Puzzle", "Saw", "Hammer", "Plank", "Key", "ScrewDriver"}
+    for _, tName in ipairs(tools) do
+        local item
+        local normal = workspace.GameplayAssets.Items.Normal.Tool:FindFirstChild(tName)
+        if normal and isModelVisible(normal) then
+            item = normal
+        else
+            local secret = workspace.GameplayAssets.Items.Secret.Tool:FindFirstChild(tName)
+            if secret and isModelVisible(secret) then
+                item = secret
+            end
+        end
+        if item then
+            return {
+                Text = "Collect " .. tName:upper() .. " 🛠️",
+                Target = item
+            }
+        end
+        local door = workspace.GameplayParts.Doors.Normal.Unlockable:FindFirstChild(tName)
+        if not door then
+            door = workspace.GameplayParts.Doors.Normal.Buildable:FindFirstChild(tName)
+        end
+        if not door then
+            door = workspace.GameplayParts.Doors.Secret.Unlockable:FindFirstChild(tName)
+        end
+        
+        local core = door and (door:FindFirstChild("Core") or door:FindFirstChildWhichIsA("BasePart"))
+        if core and core.CanCollide then
+            return {
+                Text = "Unlock " .. tName:upper() .. " Door 🚪",
+                Target = core
+            }
+        end
+    end
+    local escape = workspace.GameplayParts.Doors.Completion:FindFirstChild("Escape")
+    local core = escape and (escape:FindFirstChild("Core") or escape:FindFirstChildWhichIsA("BasePart"))
+    if core and core.CanCollide then
+        return {
+            Text = "Escape the Maze! 🏃",
+            Target = core
+        }
+    end
+    return nil
+end
+local function updateTutorialHighlight(target)
+    local h = workspace:FindFirstChild("SqwssTutorialHighlight")
+    if not target then
+        if h then h:Destroy() end
+        return
+    end
+    if not h then
+        h = Instance.new("Highlight")
+        h.Name = "SqwssTutorialHighlight"
+        h.FillColor = Color3.fromRGB(66, 133, 244)
+        h.FillTransparency = 0.4
+        h.OutlineColor = Color3.fromRGB(255, 255, 255)
+        h.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+        h.Parent = workspace
+    end
+    h.Adornee = target
+end
+local function updateTutorialBeam(targetPart)
+    local char = localPlayer.Character
+    local hrp = char and char:FindFirstChild("HumanoidRootPart")
+    if not hrp or not targetPart then
+        if hrp then
+            local att = hrp:FindFirstChild("SqwssTutorialAtt")
+            if att then att:Destroy() end
+            local beam = hrp:FindFirstChild("SqwssTutorialBeam")
+            if beam then beam:Destroy() end
+        end
+        return
+    end
+    
+    local attPlayer = hrp:FindFirstChild("SqwssTutorialAtt")
+    if not attPlayer then
+        attPlayer = Instance.new("Attachment")
+        attPlayer.Name = "SqwssTutorialAtt"
+        attPlayer.Parent = hrp
+    end
+    
+    local attTarget = targetPart:FindFirstChild("SqwssTutorialTargetAtt")
+    if not attTarget then
+        attTarget = Instance.new("Attachment")
+        attTarget.Name = "SqwssTutorialTargetAtt"
+        attTarget.Parent = targetPart
+    end
+    
+    local beam = hrp:FindFirstChild("SqwssTutorialBeam")
+    if not beam then
+        beam = Instance.new("Beam")
+        beam.Name = "SqwssTutorialBeam"
+        beam.Width0 = 0.2
+        beam.Width1 = 0.2
+        beam.FaceCamera = true
+        beam.Color = ColorSequence.new(Color3.fromRGB(66, 133, 244))
+        beam.TextureSpeed = 1.5
+        beam.Parent = hrp
+    end
+    beam.Attachment0 = attPlayer
+    beam.Attachment1 = attTarget
 end
 local function tpToCFrame(cf)
     local char = localPlayer.Character
@@ -504,6 +640,42 @@ local function tpToCFrame(cf)
         hrp.CFrame = cf
     end
 end
+local TutorialGui = Instance.new("Frame")
+TutorialGui.Name = "TutorialPanel"
+TutorialGui.Size = UDim2.new(0, 320, 0, 36)
+TutorialGui.Position = UDim2.new(0.5, -160, 0, 15)
+TutorialGui.BackgroundColor3 = Color3.fromRGB(24, 25, 32)
+TutorialGui.BorderSizePixel = 0
+TutorialGui.Visible = false
+TutorialGui.Parent = ScreenGui
+local TBCorner2 = Instance.new("UICorner")
+TBCorner2.CornerRadius = UDim.new(0, 8)
+TBCorner2.Parent = TutorialGui
+local TBStroke2 = Instance.new("UIStroke")
+TBStroke2.Color = Color3.fromRGB(66, 133, 244)
+TBStroke2.Thickness = 1.2
+TBStroke2.Parent = TutorialGui
+local TutorialLabel = Instance.new("TextLabel")
+TutorialLabel.Size = UDim2.new(1, -20, 1, 0)
+TutorialLabel.Position = UDim2.new(0, 10, 0, 0)
+TutorialLabel.BackgroundTransparency = 1
+TutorialLabel.Text = "Objective: None"
+TutorialLabel.TextColor3 = Color3.fromRGB(240, 240, 245)
+TutorialLabel.Font = Enum.Font.GothamBold
+TutorialLabel.TextSize = 11
+TutorialLabel.Parent = TutorialGui
+makeToggle(tabs["Guide"].Page, "Step-by-Step Tutorial Guide", false, function(v)
+    tutorialEnabled = v
+end)
+makeButton(tabs["Guide"].Page, "Teleport to Current Objective", function()
+    local step = getNextTutorialStep()
+    if step and step.Target then
+        local primary = step.Target:IsA("Model") and (step.Target.PrimaryPart or step.Target:FindFirstChildWhichIsA("BasePart")) or step.Target
+        if primary then
+            tpToCFrame(primary.CFrame * CFrame.new(0, 3, 0))
+        end
+    end
+end)
 makeButton(tabs["Teleport"].Page, "Teleport to Spawn / Safe Zone", function()
     tpToCFrame(getLobbySpawn())
 end)
@@ -594,7 +766,7 @@ local AboutText = Instance.new("TextLabel")
 AboutText.Size = UDim2.new(1, 0, 1, -40)
 AboutText.Position = UDim2.new(0, 0, 0, 35)
 AboutText.BackgroundTransparency = 1
-AboutText.Text = "Developer / Creator:\nsqwss\n\nFeatures:\n- Item ESP (Paint, Brushes, Tools)\n- Monster Highlight / Chams\n- Speed & Jump adjustments\n- Fly, Noclip & Infinite Jump\n- Item Teleports\n\nEnjoy the game!"
+AboutText.Text = "Developer / Creator:\nsqwss\n\nFeatures:\n- Item ESP (Paint, Brushes, Tools)\n- Monster Highlight / Chams\n- Speed & Jump adjustments\n- Fly, Noclip & Infinite Jump\n- Item Teleports\n- Step-by-step Game Guide & Beam Tracer\n\nEnjoy the game!"
 AboutText.TextColor3 = Color3.fromRGB(180, 182, 190)
 AboutText.Font = Enum.Font.GothamMedium
 AboutText.TextSize = 13
@@ -747,6 +919,38 @@ RunService.RenderStepped:Connect(function()
             bGui:Destroy()
             activeLabels[key] = nil
         end
+    end
+end)
+RunService.RenderStepped:Connect(function()
+    if not tutorialEnabled then
+        TutorialGui.Visible = false
+        updateTutorialHighlight(nil)
+        updateTutorialBeam(nil)
+        return
+    end
+    
+    local char = localPlayer.Character
+    local hrp = char and char:FindFirstChild("HumanoidRootPart")
+    
+    local step = getNextTutorialStep()
+    if step and step.Target and hrp then
+        TutorialGui.Visible = true
+        local primary = step.Target:IsA("Model") and (step.Target.PrimaryPart or step.Target:FindFirstChildWhichIsA("BasePart")) or step.Target
+        if primary then
+            local dist = math.round((hrp.Position - primary.Position).Magnitude)
+            TutorialLabel.Text = step.Text .. " [" .. dist .. "m]"
+            updateTutorialHighlight(step.Target)
+            updateTutorialBeam(primary)
+        else
+            TutorialLabel.Text = step.Text
+            updateTutorialHighlight(step.Target)
+            updateTutorialBeam(nil)
+        end
+    else
+        TutorialGui.Visible = true
+        TutorialLabel.Text = step and step.Text or "All steps completed! 🎉"
+        updateTutorialHighlight(nil)
+        updateTutorialBeam(nil)
     end
 end)
 UserInputService.JumpRequest:Connect(function()
