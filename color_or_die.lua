@@ -782,7 +782,7 @@ end
 mapViewport.InputBegan:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
         if input.UserInputType == Enum.UserInputType.Touch then
-            activeTouches[input.UserInputIndex] = input.Position
+            activeTouches[input] = input.Position
         end
         local touchCount = 0
         for _ in pairs(activeTouches) do touchCount = touchCount + 1 end
@@ -798,13 +798,13 @@ end)
 UserInputService.InputChanged:Connect(function(input)
     if not mapEnabled or not guiVisible then return end
     if input.UserInputType == Enum.UserInputType.Touch then
-        if activeTouches[input.UserInputIndex] then
-            activeTouches[input.UserInputIndex] = input.Position
+        if activeTouches[input] then
+            activeTouches[input] = input.Position
         end
     end
     local touchCount = 0
     local touches = {}
-    for index, pos in pairs(activeTouches) do
+    for _, pos in pairs(activeTouches) do
         touchCount = touchCount + 1
         table.insert(touches, pos)
     end
@@ -833,7 +833,7 @@ end)
 UserInputService.InputEnded:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
         if input.UserInputType == Enum.UserInputType.Touch then
-            activeTouches[input.UserInputIndex] = nil
+            activeTouches[input] = nil
         end
         local touchCount = 0
         for _ in pairs(activeTouches) do touchCount = touchCount + 1 end
